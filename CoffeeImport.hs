@@ -45,3 +45,6 @@ getPath :: Filename -> Filename
 getPath file = 
     let i = last $ L.findIndices (== '/') file in 
         fst $ splitAt (i + 1) file
+
+-- TODO have build order also be able to generate grunt.js or (m|j|c)ake files 
+-- have run entirely inside of coffescript
