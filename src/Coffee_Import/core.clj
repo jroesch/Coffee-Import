@@ -1,7 +1,9 @@
 (ns Coffee-Import.core
   (:require clojure.java.io 
             [clojure.string :as string]
-            [Coffee-Import.set :as iset]))
+            [Coffee-Import.set :as iset])
+  (:import java.io.File)
+  (:gen-class :main true))
 
 (defn read-file
   "Takes a filename and returns its contents"
@@ -24,6 +26,18 @@
   (let [matches (or-empty (re-find #"#import ((\"|').*(\"|'))" line))]
     (string/replace (nth matches 1 "") "\"" "")))
 
+(defn get-contents [dir-name]
+  (let [dir (new File dir-name)]
+    (map #(.getAbsolutePath %) (filter #(not (.isHidden %)) (seq (.listFiles dir))))))
+
+(defn expand-wild-cards 
+  [fname]
+  (let [matches (re-find #".*/\*" fname)]
+    (if matches
+      (get-contents 
+	     (.substring fname 0 (- (.length fname) 1))) 
+       fname)))
+
 (defn lines [buffer] 
   (string/split buffer #"\n"))
 
@@ -35,12 +49,18 @@
   "Retreive all dependencies from a file"
   [filename]
   (let [contents (read-file filename) ls (lines contents)]
-  	(filter #(not (empty? %)) (map extract-filename ls))))
+  	(filter #(not (empty? %)) 
+      (map extract-filename ls))))
 
 (defn order-deps [st filename]
   (let [root  (get-path filename)
-        files (map #(str root %) (get-deps filename))]
+        resolve-path #(str root %)
+        files (flatten (map #(expand-wild-cards (resolve-path %)) (get-deps filename)))]
   	(iset/insert (reduce order-deps st files) filename)))
+
+(defn output-file [filename]
+  (let [contents (read-file filename)]
+    (str "#" filename "\n" contents)))
 
 (defn -main
   "Takes a filename and returns a concatenated fully resolved version."
@@ -49,5 +69,8 @@
     (println "Please provide a filename: coffee-import <filename>")
     (let [file   (first args)
           files  ((order-deps iset/empty-set file) :show)
-          output (map read-file files)]
-      (print (reduce #(str %1 %2 "\n\n") output)))))
+          output (map output-file files)]
+      (do
+        ;(println "#Ordering: ")
+        ;(map #(println (str "#" %)) files)
+      	(print (reduce #(str %1 %2 "\n\n") output))))))
