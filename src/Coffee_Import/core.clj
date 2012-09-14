@@ -52,11 +52,11 @@
   	(filter #(not (empty? %)) 
       (map extract-filename ls))))
 
-(defn order-deps [st filename]
-  (let [root  (get-path filename)
-        resolve-path #(str root %)
-        files (flatten (map #(expand-wild-cards (resolve-path %)) (get-deps filename)))]
-  	(iset/insert (reduce order-deps st files) filename)))
+(defn order-deps [s f root]
+  ((fn step [st filename]
+    (let [resolve-path #(str root %)
+          files (flatten (map #(expand-wild-cards (resolve-path %)) (get-deps filename)))]
+    	(iset/insert (reduce step st files) filename))) s f))
 
 (defn output-file [filename]
   (let [contents (read-file filename)]
@@ -68,7 +68,7 @@
   (if (nil? args)
     (println "Please provide a filename: coffee-import <filename>")
     (let [file   (first args)
-          files  ((order-deps iset/empty-set file) :show)
+          files  ((order-deps iset/empty-set file (get-path file)) :show)
           output (map output-file files)]
       (do
         ;(println "#Ordering: ")
